@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 OLED Video Animation Converter — Pro Edition</title>
+    <meta name="description"
+        content="Convert any video into 1-bit animation for 128x64 OLED displays with ESP32. Advanced dithering, cropping, panning, and Wokwi simulator.">
+    <meta property="og:title" content="ESP32 OLED Video Animation Converter | Pro Edition">
+    <meta property="og:description"
+        content="Convert any video into 1-bit animation for 128x64 OLED displays with ESP32.">
+    <meta property="og:type" content="website">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="bg-grid"></div>
+    <div class="bg-glow bg-glow-1"></div>
+    <div class="bg-glow bg-glow-2"></div>
+
+    <div class="app-wrapper">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-chip">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="4" y="4" width="16" height="16" rx="2" />
+                    <rect x="9" y="9" width="6" height="6" />
+                    <line x1="9" y1="1" x2="9" y2="4" />
+                    <line x1="15" y1="1" x2="15" y2="4" />
+                    <line x1="9" y1="20" x2="9" y2="23" />
+                    <line x1="15" y1="20" x2="15" y2="23" />
+                    <line x1="20" y1="9" x2="23" y2="9" />
+                    <line x1="20" y1="14" x2="23" y2="14" />
+                    <line x1="1" y1="9" x2="4" y2="9" />
+                    <line x1="1" y1="14" x2="4" y2="14" />
+                </svg>
+            </div>
+            <div class="header-text">
+                <h1>ESP32 OLED Video Converter</h1>
+                <p class="subtitle">Transform any video into 1-bit OLED animation &bull; 128&times;64</p>
+            </div>
+            <span class="header-badge">Pro Edition</span>
+        </header>
+
+        <!-- ===== STEP 0: VIDEO CROP & RESIZE ===== -->
+        <section class="card card-crop" id="crop-card">
+            <div class="card-header">
+                <span class="step-badge">0</span>
+                <h2>Video Crop &amp; Resize <span class="dim">(Fix Cropped Videos)</span></h2>
+            </div>
+            <p class="card-description">If your video appears cropped or doesn't fit right on the OLED, use these
+                controls to select the exact region you want displayed. The crop is applied <strong>before</strong> all
+                other processing.</p>
+
+            <div class="crop-layout">
+                <div class="crop-viewport-wrap">
+                    <div class="crop-viewport" id="cropViewport">
+                        <canvas id="cropCanvas"></canvas>
+                        <div class="crop-overlay" id="cropOverlay">
+                            <div class="crop-region" id="cropRegion">
+                                <div class="crop-handle crop-handle-nw" data-handle="nw"></div>
+                                <div class="crop-handle crop-handle-ne" data-handle="ne"></div>
+                                <div class="crop-handle crop-handle-sw" data-handle="sw"></div>
+                                <div class="crop-handle crop-handle-se" data-handle="se"></div>
+                                <div class="crop-info" id="cropInfo">128×64</div>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="control-hint" style="text-align:center;margin-top:8px;">Drag the crop box or resize
+                        handles. The selected region maps to 128×64.</p>
+                </div>
+                <div class="crop-controls">
+                    <div class="control-group">
+                        <label class="control-label"><span>Crop X: <span id="cropXVal">0</span>%</span>
+                            <button class="reset-btn" id="resetCropX" title="Reset">↺</button></label>
+                        <input type="range" id="cropX" min="0" max="100" value="0">
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label"><span>Crop Y: <span id="cropYVal">0</span>%</span>
+                            <button class="reset-btn" id="resetCropY" title="Reset">↺</button></label>
+                        <input type="range" id="cropY" min="0" max="100" value="0">
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label"><span>Crop Width: <span id="cropWVal">100</span>%</span>
+                            <button class="reset-btn" id="resetCropW" title="Reset">↺</button></label>
+                        <input type="range" id="cropW" min="10" max="100" value="100">
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label"><span>Crop Height: <span id="cropHVal">100</span>%</span>
+                            <button class="reset-btn" id="resetCropH" title="Reset">↺</button></label>
+                        <input type="range" id="cropH" min="10" max="100" value="100">
+                    </div>
+
+                    <div class="divider"></div>
+
+                    <div class="control-group">
+                        <label class="control-label">Crop Aspect Ratio</label>
+                        <div class="select-wrapper">
+                            <select id="cropAspect">
+                                <option value="free">Free (Drag Freely)</option>
+                                <option value="2:1" selected>2:1 (OLED 128×64)</option>
+                                <option value="16:9">16:9 (Widescreen)</option>
+                                <option value="4:3">4:3 (Standard)</option>
+                                <option value="1:1">1:1 (Square)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="cropEnabled">
+                        <label for="cropEnabled">Enable Crop</label>
+                    </div>
+
+                    <button id="resetCropAll" class="btn btn-ghost" style="margin-top:10px;">
+                        ↺ Reset All Crop
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== MAIN GRID ===== -->
+        <div class="main-grid">
+            <!-- LEFT: Settings -->
+            <section class="card card-settings" id="settings-card">
+                <div class="card-header">
+                    <span class="step-badge">1</span>
+                    <h2>Input &amp; Settings</h2>
+                </div>
+
+                <div class="upload-zone" id="uploadZone">
+                    <input type="file" id="upload" accept="video/*">
+                    <div class="upload-content">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="17 8 12 3 7 8" />
+                            <line x1="12" y1="3" x2="12" y2="15" />
+                        </svg>
+                        <span class="upload-label">Drop a video file or <em>browse</em></span>
+                        <span class="upload-hint">Supports MP4, WebM, AVI &amp; more</span>
+                    </div>
+                </div>
+
+                <button id="rotateBtn" class="btn btn-ghost">↻ Rotate Video 90°</button>
+
+                <!-- Dither Mode (expanded) -->
+                <div class="control-group">
+                    <label class="control-label">Color Conversion Method</label>
+                    <div class="select-wrapper">
+                        <select id="ditherMode">
+                            <option value="threshold">Solid Threshold (Pure Black/White)</option>
+                            <optgroup label="Ordered Dithering">
+                                <option value="bayer2">Bayer 2×2 (Coarse Pattern)</option>
+                                <option value="bayer4">Bayer 4×4 (Medium Pattern)</option>
+                                <option value="bayer" selected>Bayer 8×8 (Smooth, Image2cpp style)</option>
+                            </optgroup>
+                            <optgroup label="Error-Diffusion Dithering">
+                                <option value="floyd">Floyd-Steinberg (Smooth, Great for Detail)</option>
+                                <option value="atkinson">Atkinson (Prevents Shadow Blocking)</option>
+                                <option value="sierra">Sierra Lite (Balanced, Fast)</option>
+                                <option value="stucki">Stucki (Sharper Edges, High Detail)</option>
+                            </optgroup>
+                            <option value="random">Random Noise Dithering (Grain Effect)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Scale Mode (expanded) -->
+                <div class="control-group">
+                    <label class="control-label">Display Scale Mode</label>
+                    <div class="select-wrapper">
+                        <select id="scaleMode">
+                            <option value="fit">Best Fit (Proportional with Black Borders)</option>
+                            <option value="cover">Fill / Cover (Fill Screen &amp; Pan)</option>
+                            <option value="stretch">Stretch (Force Fill 128×64)</option>
+                            <option value="centercrop">Center Crop (Crop Center to Fill)</option>
+                            <option value="pixel">Pixel-Perfect 1:1 (No Scaling)</option>
+                            <option value="custom">Custom (Manual Scale Control)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Custom Controls Panel -->
+                <div id="customControls" class="custom-panel">
+                    <p id="customTitle" class="custom-panel-title">CUSTOM CONTROLS:</p>
+                    <div class="control-group" id="grpW">
+                        <label class="control-label"><span>Width (W): <span id="cwVal">128</span></span></label>
+                        <input type="range" id="customW" min="10" max="256" value="128">
+                    </div>
+                    <div class="control-group" id="grpH">
+                        <label class="control-label"><span>Height (H): <span id="chVal">64</span></span></label>
+                        <input type="range" id="customH" min="10" max="128" value="64">
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label"><span>Pan X: <span id="cxVal">0</span></span>
+                            <button class="reset-btn" id="resetX" title="Reset">↺</button></label>
+                        <input type="range" id="customX" min="-128" max="128" value="0">
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label"><span>Pan Y: <span id="cyVal">0</span></span>
+                            <button class="reset-btn" id="resetY" title="Reset">↺</button></label>
+                        <input type="range" id="customY" min="-64" max="64" value="0">
+                    </div>
+                </div>
+
+                <!-- FPS -->
+                <div class="control-group">
+                    <label class="control-label"><span>Target FPS: <span id="fpsVal">10</span></span>
+                        <button class="reset-btn" id="resetFps" title="Reset FPS to 10">↺</button></label>
+                    <input type="range" id="fps" min="1" max="30" value="10">
+                </div>
+
+                <!-- Frame Range -->
+                <div class="divider"></div>
+                <p class="section-label">FRAME RANGE <span class="section-hint">(Extract Portion)</span></p>
+                <div class="control-group">
+                    <label class="control-label"><span>Start Time: <span id="startTimeVal">0.0s</span></span>
+                        <button class="reset-btn" id="resetStartTime" title="Reset">↺</button></label>
+                    <input type="range" id="startTime" min="0" max="100" value="0" step="0.1">
+                </div>
+                <div class="control-group">
+                    <label class="control-label"><span>End Time: <span id="endTimeVal">end</span></span>
+                        <button class="reset-btn" id="resetEndTime" title="Reset">↺</button></label>
+                    <input type="range" id="endTime" min="0" max="100" value="100" step="0.1">
+                </div>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="useFrameRange">
+                    <label for="useFrameRange">Use Custom Frame Range</label>
+                </div>
+
+                <div class="divider"></div>
+                <p class="section-label">IMAGE ADJUSTMENTS <span class="section-hint">(Important for Text)</span></p>
+
+                <!-- Thickness -->
+                <div class="control-group control-highlight">
+                    <label class="control-label"><span>Text/Line Thickness</span>
+                        <button class="reset-btn" id="resetThick" title="Reset">↺</button></label>
+                    <div class="dual-input">
+                        <input type="range" id="thickness" min="-3" max="3" value="0" step="0.1">
+                        <input type="number" id="thickNum" min="-3" max="3" value="0" step="0.1">
+                    </div>
+                    <p class="control-hint">← Thicken Black (Min) &nbsp;|&nbsp; Thicken White (Plus) →</p>
+                </div>
+
+                <!-- B/W Threshold -->
+                <div class="control-group">
+                    <label class="control-label"><span>B/W / Dither Bias: <span id="threshVal">128</span></span>
+                        <button class="reset-btn" id="resetThresh" title="Reset to 128">↺</button></label>
+                    <input type="range" id="threshold" min="0" max="255" value="128">
+                </div>
+
+                <!-- Contrast -->
+                <div class="control-group">
+                    <label class="control-label"><span>Contrast: <span id="contrastVal">100%</span></span>
+                        <button class="reset-btn" id="resetContrast" title="Reset to 100%">↺</button></label>
+                    <input type="range" id="contrast" min="0" max="300" value="100">
+                </div>
+
+                <!-- Brightness -->
+                <div class="control-group">
+                    <label class="control-label"><span>Brightness: <span id="brightVal">100%</span></span>
+                        <button class="reset-btn" id="resetBrightness" title="Reset to 100%">↺</button></label>
+                    <input type="range" id="brightness" min="0" max="200" value="100">
+                </div>
+
+                <!-- Gamma -->
+                <div class="control-group">
+                    <label class="control-label"><span>Gamma: <span id="gammaVal">1.0</span></span>
+                        <button class="reset-btn" id="resetGamma" title="Reset to 1.0">↺</button></label>
+                    <input type="range" id="gamma" min="0.2" max="3.0" value="1.0" step="0.1">
+                </div>
+
+                <!-- Sharpen -->
+                <div class="control-group">
+                    <label class="control-label"><span>Edge Enhance: <span id="sharpenVal">0</span></span>
+                        <button class="reset-btn" id="resetSharpen" title="Reset to 0">↺</button></label>
+                    <input type="range" id="sharpen" min="0" max="5" value="0" step="0.5">
+                </div>
+
+                <!-- Invert + Mirror -->
+                <div class="checkbox-group">
+                    <input type="checkbox" id="invert">
+                    <label for="invert">Invert Colors</label>
+                </div>
+                <div class="checkbox-group" style="margin-top:6px;">
+                    <input type="checkbox" id="mirrorH">
+                    <label for="mirrorH">Mirror Horizontal</label>
+                </div>
+                <div class="checkbox-group" style="margin-top:6px;">
+                    <input type="checkbox" id="mirrorV">
+                    <label for="mirrorV">Mirror Vertical</label>
+                </div>
+
+                <button id="convertBtn" class="btn btn-primary btn-convert" disabled>
+                    ▶ Start Frame-by-Frame Extraction
+                </button>
+
+                <!-- Progress Bar -->
+                <div class="progress-wrap" id="progressWrap" style="display:none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <span class="progress-text" id="progressText">0%</span>
+                </div>
+            </section>
+
+            <!-- RIGHT: Preview -->
+            <section class="card card-preview" id="preview-card">
+                <div class="card-header">
+                    <span class="step-badge">2</span>
+                    <h2>Live Preview <span class="dim">(OLED 128×64)</span></h2>
+                </div>
+                <video id="video" controls muted loop></video>
+                <div class="oled-frame">
+                    <div class="oled-label">OLED SSD1306 / SH1106</div>
+                    <canvas id="canvas" width="128" height="64"></canvas>
+                </div>
+                <div class="status-panel">
+                    <div class="status-row">
+                        <span class="status-dot"></span>
+                        <p id="status">Status: Waiting for video…</p>
+                    </div>
+                    <div class="frame-counter">
+                        <span class="frame-label">Frames Extracted</span>
+                        <span class="frame-value" id="frameCount">0</span>
+                    </div>
+                </div>
+                <!-- Video Info Panel -->
+                <div class="status-panel" style="margin-top:10px;" id="videoInfoPanel">
+                    <p class="section-label" style="margin-bottom:8px;">VIDEO INFO</p>
+                    <div class="info-grid">
+                        <span class="info-key">Resolution:</span><span class="info-val" id="infoRes">—</span>
+                        <span class="info-key">Duration:</span><span class="info-val" id="infoDur">—</span>
+                        <span class="info-key">Est. Frames:</span><span class="info-val" id="infoFrames">—</span>
+                        <span class="info-key">Est. Memory:</span><span class="info-val" id="infoMem">—</span>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- C++ Array Output -->
+        <section class="card card-output" id="output-array-card">
+            <div class="card-header">
+                <span class="step-badge">3</span>
+                <h2>C++ Array Output <span class="dim">(VideoFrame.h)</span></h2>
+            </div>
+            <p class="card-description">Create a new file/tab in Arduino IDE named <strong>VideoFrame.h</strong> and
+                paste this code.</p>
+            <button id="copyArrayBtn" class="btn btn-accent">📋 Copy Array Data</button>
+            <textarea id="outputArray" readonly placeholder="C++ code ready to copy will appear here…"></textarea>
+        </section>
+
+        <!-- Main.ino Output -->
+        <section class="card card-output" id="output-main-card">
+            <div class="card-header">
+                <span class="step-badge">4</span>
+                <h2>Main Code <span class="dim">(Main.ino)</span></h2>
+            </div>
+            <p class="card-description">Paste this code into your main <strong>.ino</strong> file. Remember to select
+                the OLED type at the top.</p>
+            <button id="copyMainBtn" class="btn btn-accent">📋 Copy Main.ino Code</button>
+            <textarea id="outputMain" readonly style="height:400px;">
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include "VideoFrame.h"
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET    -1
+
+// ========================================================
+// ⚙️ SELECT YOUR OLED TYPE HERE (Enable only one!)
+// ========================================================
+#define USE_SSD1306
+//#define USE_SH1106
+// ========================================================
+
+#ifdef USE_SSD1306
+  #include <Adafruit_SSD1306.h>
+  Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+  #define SCREEN_COLOR WHITE
+
+#elif defined(USE_SH1106)
+  #include <Adafruit_SH110X.h>
+  Adafruit_SH1106G display = Adafruit_SH1106G(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+  #define SCREEN_COLOR SH110X_WHITE
+#endif
+
+unsigned long previousMillis = 0;
+int currentFrame = 0;
+
+void setup() {
+  Serial.begin(115200);
+
+  #ifdef USE_SSD1306
+    if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+      Serial.println(F("OLED SSD1306 connection failed."));
+      for(;;);
+    }
+  #elif defined(USE_SH1106)
+    if(!display.begin(0x3C, true)) {
+      Serial.println(F("OLED SH1106 connection failed."));
+      for(;;);
+    }
+  #endif
+
+  Wire.setClock(800000);
+  display.clearDisplay();
+  display.display();
+}
+
+void loop() {
+  unsigned long currentMillis = millis();
+  if (currentMillis - previousMillis >= FRAME_DELAY) {
+    previousMillis = currentMillis;
+    display.clearDisplay();
+    display.drawBitmap(0, 0, video_frames[currentFrame], SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_COLOR);
+    display.display();
+    currentFrame++;
+    if (currentFrame >= TOTAL_FRAMES) {
+      currentFrame = 0;
+    }
+  }
+}
+            </textarea>
+        </section>
+
+        <!-- Wokwi Simulator -->
+        <section class="card card-simulator" id="simulator-card">
+            <div class="card-header">
+                <span class="step-badge">5</span>
+                <h2>Live Simulator <span class="dim">(Wokwi)</span></h2>
+            </div>
+            <p class="card-description">Paste your Main.ino code in the editor below, then click Play (▶) to preview
+                virtually!</p>
+            <div class="iframe-wrapper">
+                <iframe src="https://wokwi.com/projects/460502579013039105" loading="lazy"
+                    title="Wokwi ESP32 OLED Simulator"></iframe>
+            </div>
+        </section>
+    </div>
+
+    <script src="crop.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
